@@ -14,7 +14,6 @@ import (
 var logger *slog.Logger
 
 func init() {
-	// デバッグモードの設定
 	var level slog.Level
 	if os.Getenv("DIRENV_TINY_DEBUG") == "1" {
 		level = slog.LevelDebug
@@ -22,7 +21,6 @@ func init() {
 		level = slog.LevelInfo
 	}
 
-	// ロガーの設定
 	opts := &slog.HandlerOptions{
 		Level: level,
 	}
@@ -81,25 +79,47 @@ func exportEnv() error {
 		return nil
 	}
 
-	if previousDir != "" {
-		previousEnvrcPath := filepath.Join(previousDir, ".envrc")
-		if _, err := os.Stat(previousEnvrcPath); err == nil {
-			logger.Debug("Unloading previous .envrc", "path", previousEnvrcPath)
-			if err := unloadEnv(previousEnvrcPath); err != nil {
-				return fmt.Errorf("failed to unload previous .envrc: %w", err)
-			}
-		}
+	if err := handlePreviousEnvrc(previousDir); err != nil {
+		return err
 	}
 
-	envrcPath := filepath.Join(currentDir, ".envrc")
-	if _, err := os.Stat(envrcPath); err == nil {
-		logger.Debug("Loading .envrc", "path", envrcPath)
-		if err := loadEnv(envrcPath); err != nil {
-			return fmt.Errorf("failed to load .envrc: %w", err)
-		}
+	if err := handleCurrentEnvrc(currentDir); err != nil {
+		return err
 	}
 
 	fmt.Printf("export DIRENV_TINY_PREVIOUS_DIR=\"%s\"\n", currentDir)
+	return nil
+}
+
+func handlePreviousEnvrc(previousDir string) error {
+	if previousDir == "" {
+		return nil
+	}
+
+	previousEnvrcPath := filepath.Join(previousDir, ".envrc")
+	if _, err := os.Stat(previousEnvrcPath); err != nil {
+		return nil // .envrc file doesn't exist, nothing to unload
+	}
+
+	logger.Debug("Unloading previous .envrc", "path", previousEnvrcPath)
+	if err := unloadEnv(previousEnvrcPath); err != nil {
+		return fmt.Errorf("failed to unload previous .envrc: %w", err)
+	}
+
+	return nil
+}
+
+func handleCurrentEnvrc(currentDir string) error {
+	envrcPath := filepath.Join(currentDir, ".envrc")
+	if _, err := os.Stat(envrcPath); err != nil {
+		return nil // .envrc file doesn't exist, nothing to load
+	}
+
+	logger.Debug("Loading .envrc", "path", envrcPath)
+	if err := loadEnv(envrcPath); err != nil {
+		return fmt.Errorf("failed to load .envrc: %w", err)
+	}
+
 	return nil
 }
 
